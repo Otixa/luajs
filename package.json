@@ -1,0 +1,9 @@
+{
+  "name": "luajs",
+  "version": "0.0.1",
+  "description": "NodeJS-Lua bridge",
+  "main": "index.js",
+  "repository": "https://github.com/lukaskollmer/luajs",
+  "author": "Lukas Kollmer",
+  "license": "MIT"
+}
