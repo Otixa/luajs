@@ -22,7 +22,6 @@ namespace luajs {
 
   void Initialize(Local<Object> exports) {
       NODE_SET_METHOD(exports, "luaVersion", LuaVersion);
-
       LuaState::Init(exports);
   }
 

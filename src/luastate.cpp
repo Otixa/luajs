@@ -40,6 +40,7 @@ namespace luajs {
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "doStringSync", DoStringSync);
+        NODE_SET_PROTOTYPE_METHOD(tpl, "doFileSync", DoFileSync);
         constructor.Reset(isolate, tpl->GetFunction());
         exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
 
@@ -65,7 +66,7 @@ namespace luajs {
         Isolate *isolate = args.GetIsolate();
 
         if (args.Length() != 1) {
-            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "LuaState#DoString takes exactly one argument")));
+            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "LuaState#DoStringSync takes exactly one argument")));
         }
 
         const char *code = ValueToChar(isolate, args[0]);
@@ -76,7 +77,28 @@ namespace luajs {
 
         if (luaL_dostring(obj->lua_, code)) {
             const char *luaErrorMsg = lua_tostring(obj->lua_, -1);
+            isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, luaErrorMsg)));
+            return;
+        } else {
+            if (lua_gettop(obj->lua_)) {
+                args.GetReturnValue().Set(ValueFromLuaObject(isolate, obj->lua_, -1));
+            }
+            return;
+        }
+    }
 
+    void LuaState::DoFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
+        Isolate *isolate = args.GetIsolate();
+
+        if (args.Length() != 1) {
+            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, "LuaState#DoFileSync takes exactly one argument")));
+        }
+
+        const char *file = ValueToChar(isolate, args[0]);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+        if (luaL_dofile(obj->lua_, file)) {
+            const char *luaErrorMsg = lua_tostring(obj->lua_, -1);
             isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, luaErrorMsg)));
             return;
         } else {

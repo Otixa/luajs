@@ -26,6 +26,7 @@ namespace luajs {
 
         static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void DoStringSync(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void DoFileSync(const v8::FunctionCallbackInfo<v8::Value>& args);
 
     private:
         ~LuaState();
