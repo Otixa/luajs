@@ -7,14 +7,61 @@
 #include <string>
 #include "luastate.h"
 #include "luajs_utils.h"
+#include <nan.h>
 
 using namespace v8;
+
+using ResolverPersistent = Nan::Persistent<v8::Promise::Resolver>;
 
 std::set<std::string> luaStateNames;
 
 static bool NameExists(std::string name) {
     return luaStateNames.find(name) != luaStateNames.end();
 }
+
+
+struct async_lua_worker {
+    Isolate* isolate;
+    ResolverPersistent* persistent;
+    const char* data;
+    bool error;
+    char msg[1000];
+    luajs::LuaState *state;
+};
+
+
+#define lua_do(func) \
+    void func (uv_work_t *req) {\
+        async_lua_worker *worker = static_cast<async_lua_worker*>(req->data); \
+        if (luaL_ ## func (worker->state->GetLuaState(), worker->data)) { \
+            worker->error = true; \
+            sprintf(worker->msg, "%s", lua_tostring(worker->state->GetLuaState(), -1)); \
+        } \
+    } \
+
+
+lua_do(dostring)
+lua_do(dofile)
+
+
+void async_after(uv_work_t *req, int status) {
+    async_lua_worker *worker = static_cast<async_lua_worker *>(req->data);
+
+    HandleScope scope(worker->isolate);
+
+    auto resolver = Nan::New(*worker->persistent);
+
+    if (worker->error) {
+        resolver->Reject(Nan::New(worker->msg).ToLocalChecked());
+    } else {
+        Local<Value> retval = ValueFromLuaObject(worker->isolate, worker->state->GetLuaState(), -1);
+        resolver->Resolve(retval);
+    }
+
+    worker->persistent->Reset();
+    delete worker->persistent;
+}
+
 
 namespace luajs {
 
@@ -41,11 +88,15 @@ namespace luajs {
         NODE_SET_PROTOTYPE_METHOD(tpl, "close", Close);
         NODE_SET_PROTOTYPE_METHOD(tpl, "reset", Reset);
 
+        NODE_SET_PROTOTYPE_METHOD(tpl, "doString", DoString);
+        NODE_SET_PROTOTYPE_METHOD(tpl, "doFile", DoFile);
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "doStringSync", DoStringSync);
         NODE_SET_PROTOTYPE_METHOD(tpl, "doFileSync", DoFileSync);
         NODE_SET_PROTOTYPE_METHOD(tpl, "getGlobal", GetGlobal);
         NODE_SET_PROTOTYPE_METHOD(tpl, "setGlobal", SetGlobal);
+
+        NODE_SET_PROTOTYPE_METHOD(tpl,"registerFunction", RegisterFunction);
 
         constructor.Reset(isolate, tpl->GetFunction());
         exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
@@ -54,6 +105,7 @@ namespace luajs {
 
     void LuaState::New(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
 
         char *name;
 
@@ -84,6 +136,7 @@ namespace luajs {
     }
 
     void LuaState::Reset(const v8::FunctionCallbackInfo<v8::Value>& args) {
+        HandleScope scope(args.GetIsolate());
         printf("%s\n", __PRETTY_FUNCTION__);
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
 
@@ -93,6 +146,7 @@ namespace luajs {
     }
 
     void LuaState::Close(const v8::FunctionCallbackInfo<v8::Value>& args) {
+        HandleScope scope(args.GetIsolate());
         printf("%s\n", __PRETTY_FUNCTION__);
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
 
@@ -101,12 +155,12 @@ namespace luajs {
         obj->isClosed_ = true;
     }
 
-
     void LuaState::DoStringSync(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
 
         if (args.Length() != 1) {
-            isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#DoStringSync takes exactly one argument")));
+            isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#doStringSync takes exactly one argument")));
         }
 
         const char *code = ValueToChar(isolate, args[0]);
@@ -135,6 +189,7 @@ namespace luajs {
 
     void LuaState::DoFileSync(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
 
         if (args.Length() != 1) {
             isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#DoFileSync takes exactly one argument")));
@@ -158,6 +213,7 @@ namespace luajs {
 
     void LuaState::GetGlobal(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
 
         if (!args[0]->IsString()) {
             isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#getGlobal tales exactly one string")));
@@ -173,6 +229,7 @@ namespace luajs {
 
     void LuaState::SetGlobal(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
 
         if (args.Length() != 2) {
             isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#setGlobal takes exactly two arguments")));
@@ -188,6 +245,54 @@ namespace luajs {
 
         lua_setglobal(obj->lua_, name);
 
+    }
+
+    void LuaState::RegisterFunction(const v8::FunctionCallbackInfo<v8::Value>& args) {
+        Isolate *isolate = args.GetIsolate();
+    }
+
+    void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
+        auto promise = LuaState::CreateLuaEvaluationPromise(args, dostring);
+
+        args.GetReturnValue().Set(promise);
+    }
+
+    void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
+        auto promise = LuaState::CreateLuaEvaluationPromise(args, dofile);
+
+        args.GetReturnValue().Set(promise);
+    }
+
+    //
+    // Helper functions
+    //
+
+    Local<Promise> LuaState::CreateLuaEvaluationPromise(const FunctionCallbackInfo<Value>& args, uv_work_cb cb) {
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        auto resolver = v8::Promise::Resolver::New(args.GetIsolate());
+        auto promise = resolver->GetPromise();
+        auto persistent = new ResolverPersistent(resolver);
+
+
+        async_lua_worker *reqData = new async_lua_worker();
+
+        reqData->isolate = isolate;
+        reqData->data = ValueToChar(isolate, args[0]);
+        reqData->persistent = persistent;
+
+        reqData->state = obj;
+        obj->Ref();
+
+        uv_work_t *req = new uv_work_t;
+        req->data = reqData;
+
+        uv_queue_work(uv_default_loop(), req, cb, async_after);
+
+        return promise;
     }
 
 }

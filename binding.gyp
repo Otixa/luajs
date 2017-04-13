@@ -12,6 +12,7 @@
       ],
       "include_dirs": [
         "<@(lua_include)",
+        "<!(node -e \"require('nan')\")",
       ],
       "libraries": [
         "<!(echo $NODELUA_FLAGS)",

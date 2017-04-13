@@ -49,7 +49,8 @@ INCS_Debug := \
 	-I/Users/lukaskollmer/.node-gyp/7.8.0/src \
 	-I/Users/lukaskollmer/.node-gyp/7.8.0/deps/uv/include \
 	-I/Users/lukaskollmer/.node-gyp/7.8.0/deps/v8/include \
-	-I/usr/local/include
+	-I/usr/local/include \
+	-I$(srcdir)/node_modules/nan
 
 DEFS_Release := \
 	'-DNODE_GYP_MODULE_NAME=luajs' \
@@ -96,7 +97,8 @@ INCS_Release := \
 	-I/Users/lukaskollmer/.node-gyp/7.8.0/src \
 	-I/Users/lukaskollmer/.node-gyp/7.8.0/deps/uv/include \
 	-I/Users/lukaskollmer/.node-gyp/7.8.0/deps/v8/include \
-	-I/usr/local/include
+	-I/usr/local/include \
+	-I$(srcdir)/node_modules/nan
 
 OBJS := \
 	$(obj).target/$(TARGET)/src/luajs.o \

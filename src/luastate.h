@@ -10,6 +10,7 @@
 #include <node.h>
 #include <node_object_wrap.h>
 #include <v8.h>
+#include <uv.h>
 
 // Lua Headers
 extern "C" {
@@ -27,10 +28,19 @@ namespace luajs {
         static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void Reset(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+        static void DoString(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void DoStringSync(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void DoFile(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void DoFileSync(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void GetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void SetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+        static void RegisterFunction(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+        lua_State* GetLuaState() { return lua_; }
+        const char* GetName() { return name_; }
+        bool IsClosed() { return isClosed_; }
 
     private:
         ~LuaState();
@@ -40,6 +50,8 @@ namespace luajs {
         bool isClosed_;
 
         static v8::Persistent<v8::Function> constructor;
+
+        static v8::Local<v8::Promise> CreateLuaEvaluationPromise(const v8::FunctionCallbackInfo<v8::Value>& args, uv_work_cb cb);
 
     };
 }

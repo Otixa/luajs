@@ -1,10 +1,5 @@
 #include <node.h>
-#include <v8.h>
 #include "luastate.h"
-
-extern "C" {
-  #include <lua.h>
-}
 
 namespace luajs {
 
@@ -26,5 +21,4 @@ namespace luajs {
   }
 
   NODE_MODULE(luajs, Initialize)
-
 }
