@@ -50,3 +50,30 @@ v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int 
         }
     }
 }
+
+void PushValueToLua(v8::Isolate *isolate, v8::Local<v8::Value> value, lua_State *L) {
+    if (value->IsBoolean()) {
+        lua_pushboolean(L, static_cast<int>(value->ToBoolean()->Value()));
+    } else if (value->IsNumber()) {
+        lua_pushnumber(L, value->ToNumber()->Value());
+    } else if (value->IsString()) {
+        lua_pushstring(L, ValueToChar(isolate, value));
+    } else if (value->IsNull()) {
+        lua_pushnil(L);
+    } else if (value->IsObject()) {
+        v8::Local<v8::Object> obj = value->ToObject();
+        v8::Local<v8::Array> keys = obj->GetPropertyNames();
+
+        lua_createtable(L, 0, keys->Length());
+
+        for (int i = 0; i < keys->Length(); ++i) {
+            v8::Local<v8::Value> key = keys->Get(i);
+            v8::Local<v8::Value> value = obj->Get(key);
+            PushValueToLua(isolate, key, L);
+            PushValueToLua(isolate, value, L);
+            lua_settable(L, -3);
+        }
+    } else { // Unsupported type
+        lua_pushnil(L);
+    }
+}
