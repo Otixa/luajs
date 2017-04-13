@@ -2,32 +2,31 @@
 // Created by Lukas Kollmer on 12.04.17.
 //
 
+#include <map>
+#include <set>
+#include <string>
 #include "luastate.h"
 #include "luajs_utils.h"
 
+using namespace v8;
+
+std::set<std::string> luaStateNames;
+
+static bool NameExists(std::string name) {
+    return luaStateNames.find(name) != luaStateNames.end();
+}
 
 namespace luajs {
-    using v8::Context;
-    using v8::Function;
-    using v8::FunctionCallbackInfo;
-    using v8::FunctionTemplate;
-    using v8::Isolate;
-    using v8::HandleScope;
-    using v8::Exception;
-    using v8::Local;
-    using v8::Number;
-    using v8::Object;
-    using v8::Persistent;
-    using v8::String;
-    using v8::Value;
 
     using node::ObjectWrap;
-
 
     Persistent<Function> LuaState::constructor;
 
 
-    LuaState::LuaState() {}
+    LuaState::LuaState(lua_State *state, const char *name) : lua_(state), name_(name), isClosed_(false) {
+        luaStateNames.insert(std::string(name));
+    }
+
     LuaState::~LuaState() {}
 
 
@@ -38,6 +37,10 @@ namespace luajs {
         Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
         tpl->SetClassName(String::NewFromUtf8(isolate, "LuaState"));
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
+        NODE_SET_PROTOTYPE_METHOD(tpl, "close", Close);
+        NODE_SET_PROTOTYPE_METHOD(tpl, "reset", Reset);
+
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "doStringSync", DoStringSync);
         NODE_SET_PROTOTYPE_METHOD(tpl, "doFileSync", DoFileSync);
@@ -52,16 +55,50 @@ namespace luajs {
     void LuaState::New(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
 
-        if (args.IsConstructCall()) {
-            LuaState *obj = new LuaState();
+        char *name;
 
-            obj->lua_ = luaL_newstate();
+        if (!args[0]->IsString()) {
+            do {
+                name = (char *)RandomUUID();
+            } while (NameExists(std::string(name)));
+        } else {
+            name = (char *)ValueToChar(isolate, args[0]);
+        }
+
+        if (NameExists(std::string(name))) {
+            char *excMessage;
+            asprintf(&excMessage, "Error: LuaState with name '%s' already exists", name);
+            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage)));
+            free(excMessage);
+            return;
+        }
+
+        if (args.IsConstructCall()) {
+            LuaState *obj = new LuaState(luaL_newstate(), name);
             luaL_openlibs(obj->lua_);
 
             obj->Wrap(args.This());
-
             args.GetReturnValue().Set(args.This());
+
         }
+    }
+
+    void LuaState::Reset(const v8::FunctionCallbackInfo<v8::Value>& args) {
+        printf("%s\n", __PRETTY_FUNCTION__);
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        obj->Close(args);
+        obj->lua_ = luaL_newstate();
+        obj->isClosed_ = false;
+    }
+
+    void LuaState::Close(const v8::FunctionCallbackInfo<v8::Value>& args) {
+        printf("%s\n", __PRETTY_FUNCTION__);
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        lua_close(obj->lua_);
+        obj->lua_ = NULL;
+        obj->isClosed_ = true;
     }
 
 
@@ -74,9 +111,15 @@ namespace luajs {
 
         const char *code = ValueToChar(isolate, args[0]);
 
-        printf("Will evaluate '%s'\n", code);
-
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        if (obj->isClosed_) {
+            char *errorMsg;
+            asprintf(&errorMsg, "Error: LuaState %s is closed\n", obj->name_);
+            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, errorMsg)));
+            free(errorMsg);
+            return;
+        }
 
         if (luaL_dostring(obj->lua_, code)) {
             const char *luaErrorMsg = lua_tostring(obj->lua_, -1);

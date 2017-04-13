@@ -3,7 +3,20 @@
 //
 
 #include "luajs_utils.h"
+#include <uuid/uuid.h>
 
+
+const char *RandomUUID() {
+    uuid_t uuidBuffer;
+    char uuidStr[37];
+
+    uuid_generate_random(uuidBuffer);
+    uuid_unparse(uuidBuffer, uuidStr);
+
+    char *u = (char *) malloc(37);
+    strcpy(u, uuidStr);
+    return u;
+}
 
 const char *ValueToChar(v8::Isolate *isolate, v8::Local<v8::Value> val){
     if(!val->IsString()){

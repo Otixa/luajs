@@ -21,10 +21,12 @@ extern "C" {
 namespace luajs {
     class LuaState : public node::ObjectWrap {
     public:
-        LuaState();
+        LuaState(lua_State *state, const char *name);
         static void Init(v8::Local<v8::Object> exports);
 
         static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void Reset(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void DoStringSync(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void DoFileSync(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void GetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -34,6 +36,8 @@ namespace luajs {
         ~LuaState();
 
         lua_State *lua_;
+        const char *name_;
+        bool isClosed_;
 
         static v8::Persistent<v8::Function> constructor;
 

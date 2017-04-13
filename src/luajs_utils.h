@@ -14,6 +14,9 @@ extern "C" {
 };
 
 
+const char *RandomUUID();
+
+
 const char *ValueToChar(v8::Isolate *isolate, v8::Local<v8::Value> val);
 
 v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int index);
