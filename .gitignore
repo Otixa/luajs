@@ -69,5 +69,6 @@ yarn.lock
 
 # CMake
 cmake-build-debug/
+CMakeLists.txt
 
 build/
