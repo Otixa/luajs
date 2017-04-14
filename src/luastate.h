@@ -11,6 +11,7 @@
 #include <node_object_wrap.h>
 #include <v8.h>
 #include <uv.h>
+#include <functional>
 
 // Lua Headers
 extern "C" {
@@ -20,6 +21,9 @@ extern "C" {
 };
 
 namespace luajs {
+
+    struct async_lua_worker;
+
     class LuaState : public node::ObjectWrap {
     public:
         LuaState(lua_State *state, const char *name);
@@ -38,6 +42,9 @@ namespace luajs {
 
         static void GetStatus(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+        static void LoadString(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void LoadStringSync(const v8::FunctionCallbackInfo<v8::Value>& args);
+
         lua_State* GetLuaState() { return lua_; }
         const char* GetName() { return name_; }
         bool IsClosed() { return isClosed_; }
@@ -55,7 +62,13 @@ namespace luajs {
 
         static v8::Persistent<v8::Function> constructor;
 
-        static v8::Local<v8::Promise> CreateLuaCodeEvaluationPromise(const v8::FunctionCallbackInfo<v8::Value>& args, uv_work_cb cb);
+        template<typename Functor>
+        static v8::Local<v8::Promise> CreatePromise(
+                const v8::FunctionCallbackInfo<v8::Value>& args,
+                Functor fillWorker,
+                const uv_work_cb work_cb,
+                const uv_after_work_cb after_work_cb
+        );
 
     };
 }

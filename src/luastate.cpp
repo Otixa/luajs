@@ -21,50 +21,61 @@ static bool NameExists(std::string name) {
 }
 
 
-struct async_lua_worker {
-    Isolate* isolate;
-    ResolverPersistent* persistent;
-    const char* data;
-    bool error;
-    char msg[1000];
-    luajs::LuaState *state;
-};
 
 
 #define lua_do(func) \
     void async_ ## func (uv_work_t *req) {\
         async_lua_worker *worker = static_cast<async_lua_worker*>(req->data); \
-        if (func (worker->state->GetLuaState(), worker->data)) { \
+        if (func (worker->state->GetLuaState(), (char *)worker->data)) { \
             worker->error = true; \
             sprintf(worker->msg, "%s", lua_tostring(worker->state->GetLuaState(), -1)); \
         } \
     } \
 
 
-lua_do(luaL_dostring)
-lua_do(luaL_dofile)
 
 
-void async_after(uv_work_t *req, int status) {
-    async_lua_worker *worker = static_cast<async_lua_worker *>(req->data);
 
-    HandleScope scope(worker->isolate);
 
-    auto resolver = Nan::New(*worker->persistent);
 
-    if (worker->error) {
-        resolver->Reject(Nan::New(worker->msg).ToLocalChecked());
-    } else {
-        Local<Value> retval = ValueFromLuaObject(worker->isolate, worker->state->GetLuaState(), -1);
-        resolver->Resolve(retval);
-    }
-
-    worker->persistent->Reset();
-    delete worker->persistent;
-}
 
 
 namespace luajs {
+
+    struct async_lua_worker {
+        Isolate* isolate;
+        ResolverPersistent* persistent;
+        void* data;
+        bool error;
+        char msg[1000];
+        luajs::LuaState *state;
+        int successRetval;
+        bool returnFromStack = true;
+    };
+
+    void async_after(uv_work_t *req, int status) {
+        async_lua_worker *worker = static_cast<async_lua_worker *>(req->data);
+        HandleScope scope(worker->isolate);
+
+        auto resolver = Nan::New(*worker->persistent);
+
+        if (worker->error) {
+            resolver->Reject(Nan::New(worker->msg).ToLocalChecked());
+        } else {
+            if (worker->returnFromStack) {
+                Local<Value> retval = ValueFromLuaObject(worker->isolate, worker->state->GetLuaState(), -1);
+                resolver->Resolve(retval);
+            } else {
+                resolver->Resolve(Nan::New(worker->successRetval));
+            }
+        }
+
+        worker->persistent->Reset();
+        delete worker->persistent;
+    }
+
+    lua_do(luaL_dostring)
+    lua_do(luaL_dofile)
 
     using node::ObjectWrap;
 
@@ -98,6 +109,9 @@ namespace luajs {
         NODE_SET_PROTOTYPE_METHOD(tpl, "setGlobal", SetGlobal);
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "getStatus", GetStatus);
+
+        NODE_SET_PROTOTYPE_METHOD(tpl, "loadString", LoadString);
+        NODE_SET_PROTOTYPE_METHOD(tpl, "loadStringSync", LoadStringSync);
 
         constructor.Reset(isolate, tpl->GetFunction());
         exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
@@ -213,13 +227,25 @@ namespace luajs {
     }
 
     void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, async_luaL_dostring);
+        HandleScope scope(args.GetIsolate());
+
+        auto fillWorker = [] (const FunctionCallbackInfo<Value>& args, async_lua_worker **worker)  {
+            (*worker)->data = (void*)ValueToChar(args.GetIsolate(), args[0]);
+        };
+
+        auto promise = LuaState::CreatePromise(args, fillWorker, async_luaL_dostring, async_after);
 
         args.GetReturnValue().Set(promise);
     }
 
     void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, async_luaL_dofile);
+        HandleScope scope(args.GetIsolate());
+
+        auto fillWorker = [] (const FunctionCallbackInfo<Value>& args, async_lua_worker **worker)  {
+            (*worker)->data = (void*)ValueToChar(args.GetIsolate(), args[0]);
+        };
+
+        auto promise = LuaState::CreatePromise(args, fillWorker, async_luaL_dofile, async_after);
 
         args.GetReturnValue().Set(promise);
     }
@@ -270,16 +296,66 @@ namespace luajs {
         args.GetReturnValue().Set(Number::New(isolate, status));
     }
 
+    void LuaState::LoadStringSync(const FunctionCallbackInfo<Value>& args) {
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        if (args.Length() != 1 && !args[0]->IsString()) {
+            isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument")));
+            return;
+        }
+
+        const char *code = ValueToChar(isolate, args[0]);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+        int success = luaL_loadstring(obj->GetLuaState(), code);
+
+        args.GetReturnValue().Set(Number::New(isolate, success));
+    }
+
+    void LuaState::LoadString(const FunctionCallbackInfo<Value>& args) {
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        if (args.Length() != 1 && !args[0]->IsString()) {
+            isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument")));
+            return;
+        }
+        
+        auto fillWorker = [] (const FunctionCallbackInfo<Value>& args, async_lua_worker **worker)  {
+            Isolate *isolate = args.GetIsolate();
+            HandleScope scope(isolate);
+            (*worker)->data = (void *)ValueToChar(isolate, args[0]);
+            (*worker)->returnFromStack = false;
+        };
+
+
+        auto work = [] (uv_work_t *req) {
+            async_lua_worker *worker = static_cast<async_lua_worker*>(req->data);
+            worker->successRetval = luaL_loadstring(worker->state->GetLuaState(), (char *)worker->data);
+        };
+
+        auto promise = LuaState::CreatePromise(args, fillWorker, work, async_after);
+        args.GetReturnValue().Set(promise);
+    }
+
+
+
 
     //
     // Helper functions
     //
 
-    Local<Promise> LuaState::CreateLuaCodeEvaluationPromise(const FunctionCallbackInfo<Value>& args, uv_work_cb cb) {
+    template<typename Functor>
+    Local<Promise> LuaState::CreatePromise(
+            const FunctionCallbackInfo<Value>& args,
+            Functor fillWorker,
+            const uv_work_cb work_cb,
+            const uv_after_work_cb after_work_cb) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
 
-        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+        luajs::LuaState *obj = node::ObjectWrap::Unwrap<luajs::LuaState>(args.This());
 
         auto resolver = v8::Promise::Resolver::New(args.GetIsolate());
         auto promise = resolver->GetPromise();
@@ -289,7 +365,7 @@ namespace luajs {
         async_lua_worker *reqData = new async_lua_worker();
 
         reqData->isolate = isolate;
-        reqData->data = ValueToChar(isolate, args[0]);
+        fillWorker(args, &reqData);
         reqData->persistent = persistent;
 
         reqData->state = obj;
@@ -298,7 +374,7 @@ namespace luajs {
         uv_work_t *req = new uv_work_t;
         req->data = reqData;
 
-        uv_queue_work(uv_default_loop(), req, cb, async_after);
+        uv_queue_work(uv_default_loop(), req, work_cb, after_work_cb);
 
         return promise;
     }
