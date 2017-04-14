@@ -22,22 +22,14 @@ static bool NameExists(std::string name) {
 
 
 
-
-#define lua_do(func) \
-    void async_ ## func (uv_work_t *req) {\
-        async_lua_worker *worker = static_cast<async_lua_worker*>(req->data); \
-        if (func (worker->state->GetLuaState(), (char *)worker->data)) { \
-            worker->error = true; \
+#define lua_do(func)                                                                    \
+    void async_ ## func (uv_work_t *req) {                                              \
+        async_lua_worker *worker = static_cast<async_lua_worker*>(req->data);           \
+        if (func (worker->state->GetLuaState(), (char *)worker->data)) {                \
+            worker->error = true;                                                       \
             sprintf(worker->msg, "%s", lua_tostring(worker->state->GetLuaState(), -1)); \
-        } \
-    } \
-
-
-
-
-
-
-
+        }                                                                               \
+    }                                                                                   \
 
 
 namespace luajs {
@@ -110,8 +102,8 @@ namespace luajs {
 
         NODE_SET_PROTOTYPE_METHOD(tpl, "getStatus", GetStatus);
 
-        NODE_SET_PROTOTYPE_METHOD(tpl, "loadString", LoadString);
-        NODE_SET_PROTOTYPE_METHOD(tpl, "loadStringSync", LoadStringSync);
+        //NODE_SET_PROTOTYPE_METHOD(tpl, "loadString", LoadString);
+        //NODE_SET_PROTOTYPE_METHOD(tpl, "loadStringSync", LoadStringSync);
 
         constructor.Reset(isolate, tpl->GetFunction());
         exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
@@ -296,6 +288,7 @@ namespace luajs {
         args.GetReturnValue().Set(Number::New(isolate, status));
     }
 
+    // Currently not exported to Node
     void LuaState::LoadStringSync(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
@@ -313,6 +306,7 @@ namespace luajs {
         args.GetReturnValue().Set(Number::New(isolate, success));
     }
 
+    // Currently not exported to Node
     void LuaState::LoadString(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
@@ -329,7 +323,6 @@ namespace luajs {
             (*worker)->returnFromStack = false;
         };
 
-
         auto work = [] (uv_work_t *req) {
             async_lua_worker *worker = static_cast<async_lua_worker*>(req->data);
             worker->successRetval = luaL_loadstring(worker->state->GetLuaState(), (char *)worker->data);
@@ -338,8 +331,6 @@ namespace luajs {
         auto promise = LuaState::CreatePromise(args, fillWorker, work, async_after);
         args.GetReturnValue().Set(promise);
     }
-
-
 
 
     //
