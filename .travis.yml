@@ -3,5 +3,6 @@ node_js:
   - "node"
 
 before_script:
+  - apt-get install lua5.2
   - npm install -g mocha
 script: mocha tests.js
