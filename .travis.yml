@@ -2,7 +2,11 @@ language: node_js
 node_js:
   - "node"
 
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install lua5.2
+
 before_script:
-  - apt-get install lua5.2
   - npm install -g mocha
+
 script: mocha tests.js
