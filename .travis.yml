@@ -4,7 +4,7 @@ node_js:
 
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install lua5.2
+  - sudo apt-get install lua
 
 before_script:
   - npm install -g mocha
