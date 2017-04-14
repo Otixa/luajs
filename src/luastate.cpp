@@ -32,17 +32,17 @@ struct async_lua_worker {
 
 
 #define lua_do(func) \
-    void func (uv_work_t *req) {\
+    void async_ ## func (uv_work_t *req) {\
         async_lua_worker *worker = static_cast<async_lua_worker*>(req->data); \
-        if (luaL_ ## func (worker->state->GetLuaState(), worker->data)) { \
+        if (func (worker->state->GetLuaState(), worker->data)) { \
             worker->error = true; \
             sprintf(worker->msg, "%s", lua_tostring(worker->state->GetLuaState(), -1)); \
         } \
     } \
 
 
-lua_do(dostring)
-lua_do(dofile)
+lua_do(luaL_dostring)
+lua_do(luaL_dofile)
 
 
 void async_after(uv_work_t *req, int status) {
@@ -96,6 +96,8 @@ namespace luajs {
         NODE_SET_PROTOTYPE_METHOD(tpl, "doFileSync", DoFileSync);
         NODE_SET_PROTOTYPE_METHOD(tpl, "getGlobal", GetGlobal);
         NODE_SET_PROTOTYPE_METHOD(tpl, "setGlobal", SetGlobal);
+
+        NODE_SET_PROTOTYPE_METHOD(tpl, "getStatus", GetStatus);
 
         constructor.Reset(isolate, tpl->GetFunction());
         exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
@@ -211,13 +213,13 @@ namespace luajs {
     }
 
     void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, dostring);
+        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, async_luaL_dostring);
 
         args.GetReturnValue().Set(promise);
     }
 
     void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, dofile);
+        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, async_luaL_dofile);
 
         args.GetReturnValue().Set(promise);
     }
@@ -255,7 +257,17 @@ namespace luajs {
         PushValueToLua(isolate, value, obj->lua_);
 
         lua_setglobal(obj->lua_, name);
+    }
 
+    void LuaState::GetStatus(const FunctionCallbackInfo<Value>& args) {
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        int status = lua_status(obj->GetLuaState());
+
+        args.GetReturnValue().Set(Number::New(isolate, status));
     }
 
 

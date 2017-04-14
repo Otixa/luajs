@@ -36,6 +36,8 @@ namespace luajs {
         static void GetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void SetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+        static void GetStatus(const v8::FunctionCallbackInfo<v8::Value>& args);
+
         lua_State* GetLuaState() { return lua_; }
         const char* GetName() { return name_; }
         bool IsClosed() { return isClosed_; }
