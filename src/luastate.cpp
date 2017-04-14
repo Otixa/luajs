@@ -321,7 +321,7 @@ namespace luajs {
             isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument")));
             return;
         }
-        
+
         auto fillWorker = [] (const FunctionCallbackInfo<Value>& args, async_lua_worker **worker)  {
             Isolate *isolate = args.GetIsolate();
             HandleScope scope(isolate);
