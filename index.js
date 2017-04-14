@@ -6,5 +6,5 @@ module.exports = {
 };
 
 Object.keys(binding).forEach(function(k) {
-  if (k.match(/^L/)) module.exports[k] = binding[k];
+  if (k.match(/^LUA_/)) module.exports[k] = binding[k];
 });
