@@ -56,7 +56,7 @@ let me = lua.getGlobal('name');
 let result1 = lua.doStringSync('return 5/2;');
 let result2 = lua.doFileSync('./script.lua');
 ```
-(This will throw an error if lua encounters an error running the code)
+(This will throw if lua encounters an error running the code)
 
 #### Other stuff
 
