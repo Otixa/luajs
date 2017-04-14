@@ -8,6 +8,7 @@
 #include "luastate.h"
 #include "luajs_utils.h"
 #include <nan.h>
+#include <iostream>
 
 using namespace v8;
 
@@ -95,8 +96,6 @@ namespace luajs {
         NODE_SET_PROTOTYPE_METHOD(tpl, "doFileSync", DoFileSync);
         NODE_SET_PROTOTYPE_METHOD(tpl, "getGlobal", GetGlobal);
         NODE_SET_PROTOTYPE_METHOD(tpl, "setGlobal", SetGlobal);
-
-        NODE_SET_PROTOTYPE_METHOD(tpl,"registerFunction", RegisterFunction);
 
         constructor.Reset(isolate, tpl->GetFunction());
         exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
@@ -211,6 +210,18 @@ namespace luajs {
         }
     }
 
+    void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
+        auto promise = LuaState::CreateLuaEvaluationPromise(args, dostring);
+
+        args.GetReturnValue().Set(promise);
+    }
+
+    void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
+        auto promise = LuaState::CreateLuaEvaluationPromise(args, dofile);
+
+        args.GetReturnValue().Set(promise);
+    }
+
     void LuaState::GetGlobal(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
@@ -247,21 +258,6 @@ namespace luajs {
 
     }
 
-    void LuaState::RegisterFunction(const v8::FunctionCallbackInfo<v8::Value>& args) {
-        Isolate *isolate = args.GetIsolate();
-    }
-
-    void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaEvaluationPromise(args, dostring);
-
-        args.GetReturnValue().Set(promise);
-    }
-
-    void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaEvaluationPromise(args, dofile);
-
-        args.GetReturnValue().Set(promise);
-    }
 
     //
     // Helper functions

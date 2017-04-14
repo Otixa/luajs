@@ -36,8 +36,6 @@ namespace luajs {
         static void GetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void SetGlobal(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static void RegisterFunction(const v8::FunctionCallbackInfo<v8::Value>& args);
-
         lua_State* GetLuaState() { return lua_; }
         const char* GetName() { return name_; }
         bool IsClosed() { return isClosed_; }
@@ -48,6 +46,10 @@ namespace luajs {
         lua_State *lua_;
         const char *name_;
         bool isClosed_;
+        v8::Isolate* isolate_;
+
+        v8::Isolate* GetIsolate() { return  isolate_; }
+        void SetIsolate(v8::Isolate* isolate) { this->isolate_ = isolate; }
 
         static v8::Persistent<v8::Function> constructor;
 
