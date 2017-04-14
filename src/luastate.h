@@ -53,7 +53,7 @@ namespace luajs {
 
         static v8::Persistent<v8::Function> constructor;
 
-        static v8::Local<v8::Promise> CreateLuaEvaluationPromise(const v8::FunctionCallbackInfo<v8::Value>& args, uv_work_cb cb);
+        static v8::Local<v8::Promise> CreateLuaCodeEvaluationPromise(const v8::FunctionCallbackInfo<v8::Value>& args, uv_work_cb cb);
 
     };
 }

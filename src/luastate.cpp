@@ -211,13 +211,13 @@ namespace luajs {
     }
 
     void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaEvaluationPromise(args, dostring);
+        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, dostring);
 
         args.GetReturnValue().Set(promise);
     }
 
     void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
-        auto promise = LuaState::CreateLuaEvaluationPromise(args, dofile);
+        auto promise = LuaState::CreateLuaCodeEvaluationPromise(args, dofile);
 
         args.GetReturnValue().Set(promise);
     }
@@ -263,7 +263,7 @@ namespace luajs {
     // Helper functions
     //
 
-    Local<Promise> LuaState::CreateLuaEvaluationPromise(const FunctionCallbackInfo<Value>& args, uv_work_cb cb) {
+    Local<Promise> LuaState::CreateLuaCodeEvaluationPromise(const FunctionCallbackInfo<Value>& args, uv_work_cb cb) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
 
