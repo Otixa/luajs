@@ -20,6 +20,14 @@ static bool NameExists(std::string name) {
     return luaStateNames.find(name) != luaStateNames.end();
 }
 
+#define CHECK_LUA_STATE_IS_OPEN(isolate, obj) \
+    if (obj->isClosed_) { \
+        char *errorMsg; \
+        asprintf(&errorMsg, "Error: LuaState %s is closed\n", obj->name_); \
+        isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, errorMsg))); \
+        free(errorMsg); \
+        return; \
+    }\
 
 
 #define lua_do(func)                                                                    \
@@ -143,9 +151,11 @@ namespace luajs {
     }
 
     void LuaState::Reset(const v8::FunctionCallbackInfo<v8::Value>& args) {
-        HandleScope scope(args.GetIsolate());
-        printf("%s\n", __PRETTY_FUNCTION__);
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         obj->Close(args);
         obj->lua_ = luaL_newstate();
@@ -153,9 +163,11 @@ namespace luajs {
     }
 
     void LuaState::Close(const v8::FunctionCallbackInfo<v8::Value>& args) {
-        HandleScope scope(args.GetIsolate());
-        printf("%s\n", __PRETTY_FUNCTION__);
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         lua_close(obj->lua_);
         obj->lua_ = NULL;
@@ -174,13 +186,7 @@ namespace luajs {
 
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
 
-        if (obj->isClosed_) {
-            char *errorMsg;
-            asprintf(&errorMsg, "Error: LuaState %s is closed\n", obj->name_);
-            isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, errorMsg)));
-            free(errorMsg);
-            return;
-        }
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         if (luaL_dostring(obj->lua_, code)) {
             const char *luaErrorMsg = lua_tostring(obj->lua_, -1);
@@ -206,6 +212,9 @@ namespace luajs {
         const char *file = ValueToChar(isolate, args[0]);
 
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
+
         if (luaL_dofile(obj->lua_, file)) {
             const char *luaErrorMsg = lua_tostring(obj->lua_, -1);
             isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, luaErrorMsg)));
@@ -219,7 +228,12 @@ namespace luajs {
     }
 
     void LuaState::DoString(const FunctionCallbackInfo<Value>& args) {
-        HandleScope scope(args.GetIsolate());
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         auto fillWorker = [] (const FunctionCallbackInfo<Value>& args, async_lua_worker **worker)  {
             (*worker)->data = (void*)ValueToChar(args.GetIsolate(), args[0]);
@@ -231,7 +245,12 @@ namespace luajs {
     }
 
     void LuaState::DoFile(const FunctionCallbackInfo<Value>& args) {
-        HandleScope scope(args.GetIsolate());
+        Isolate *isolate = args.GetIsolate();
+        HandleScope scope(isolate);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         auto fillWorker = [] (const FunctionCallbackInfo<Value>& args, async_lua_worker **worker)  {
             (*worker)->data = (void*)ValueToChar(args.GetIsolate(), args[0]);
@@ -254,6 +273,8 @@ namespace luajs {
 
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
 
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
+
         lua_getglobal(obj->lua_, globalName);
         args.GetReturnValue().Set(ValueFromLuaObject(isolate, obj->lua_, -1));
     }
@@ -269,6 +290,8 @@ namespace luajs {
 
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
 
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
+
         const char *name = ValueToChar(isolate, args[0]);
 
         Local<Value> value = args[1];
@@ -282,6 +305,8 @@ namespace luajs {
         HandleScope scope(isolate);
 
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         int status = lua_status(obj->GetLuaState());
 
@@ -301,6 +326,9 @@ namespace luajs {
         const char *code = ValueToChar(isolate, args[0]);
 
         LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
+
         int success = luaL_loadstring(obj->GetLuaState(), code);
 
         args.GetReturnValue().Set(Number::New(isolate, success));
@@ -310,6 +338,10 @@ namespace luajs {
     void LuaState::LoadString(const FunctionCallbackInfo<Value>& args) {
         Isolate *isolate = args.GetIsolate();
         HandleScope scope(isolate);
+
+        LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
+
+        CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         if (args.Length() != 1 && !args[0]->IsString()) {
             isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument")));
