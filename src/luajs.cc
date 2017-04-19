@@ -2,7 +2,7 @@
 #include "luastate.h"
 
 extern "C" {
-#include <lua.h>
+#include "lua/lua.h"
 }
 
 namespace luajs {
@@ -72,10 +72,10 @@ namespace luajs {
         NODE_DEFINE_CONSTANT(exports, LUA_GCSTEP);
         NODE_DEFINE_CONSTANT(exports, LUA_GCSETPAUSE);
         NODE_DEFINE_CONSTANT(exports, LUA_GCSETSTEPMUL);
-        NODE_DEFINE_CONSTANT(exports, LUA_GCSETMAJORINC);
+        //NODE_DEFINE_CONSTANT(exports, LUA_GCSETMAJORINC);
         NODE_DEFINE_CONSTANT(exports, LUA_GCISRUNNING);
-        NODE_DEFINE_CONSTANT(exports, LUA_GCGEN);
-        NODE_DEFINE_CONSTANT(exports, LUA_GCINC);
+        //NODE_DEFINE_CONSTANT(exports, LUA_GCGEN);
+        //NODE_DEFINE_CONSTANT(exports, LUA_GCINC);
 
         NODE_DEFINE_CONSTANT(exports, LUA_HOOKCALL);
         NODE_DEFINE_CONSTANT(exports, LUA_HOOKRET);

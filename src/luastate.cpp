@@ -13,8 +13,10 @@
 using namespace v8;
 
 using ResolverPersistent = Nan::Persistent<v8::Promise::Resolver>;
+using FunctionPersistent = Nan::Persistent<v8::Function, v8::NonCopyablePersistentTraits<v8::Function>>;
 
 std::set<std::string> luaStateNames;
+std::map<std::string, FunctionPersistent > functions;
 
 static bool NameExists(std::string name) {
     return luaStateNames.find(name) != luaStateNames.end();
