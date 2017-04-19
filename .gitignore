@@ -72,3 +72,5 @@ cmake-build-debug/
 CMakeLists.txt
 
 build/
+
+script.lua
