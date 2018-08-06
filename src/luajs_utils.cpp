@@ -3,19 +3,15 @@
 //
 
 #include "luajs_utils.h"
-#include <uuid/uuid.h>
+#include "uuid/sole.h"
 
 
 const char *RandomUUID() {
-    uuid_t uuidBuffer;
-    char uuidStr[37];
+    sole::uuid id = sole::uuid4();
 
-    uuid_generate_random(uuidBuffer);
-    uuid_unparse(uuidBuffer, uuidStr);
-
-    char *u = (char *) malloc(37);
-    strcpy(u, uuidStr);
-    return u;
+    // char *u = (char *) malloc(37);
+    // strcpy(u, uuidStr);
+    return id.str().c_str();
 }
 
 const char *ValueToChar(v8::Isolate *isolate, v8::Local<v8::Value> val){
@@ -68,7 +64,7 @@ void PushValueToLua(v8::Isolate *isolate, v8::Local<v8::Value> value, lua_State 
     if (value->IsBoolean()) {
         lua_pushboolean(L, static_cast<int>(value->ToBoolean()->Value()));
     } else if (value->IsNumber()) {
-        lua_pushnumber(L, value->ToNumber()->Value());
+        lua_pushnumber(L, value->ToNumber(isolate)->Value());
     } else if (value->IsString()) {
         lua_pushstring(L, ValueToChar(isolate, value));
     } else if (value->IsNull()) {

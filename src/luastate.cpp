@@ -9,6 +9,7 @@
 #include "luajs_utils.h"
 #include <nan.h>
 #include <iostream>
+#include "asprintf.h"
 
 using namespace v8;
 
