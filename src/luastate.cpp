@@ -192,19 +192,21 @@ namespace luajs {
         CHECK_LUA_STATE_IS_OPEN(isolate, obj);
 
         if (luaL_dostring(obj->lua_, code)) {
-            const char *luaErrorMsg = lua_tostring(obj->lua_, -1);
-			luaL_traceback(obj->lua_, obj->lua_, NULL, 1);
-			const char *luaStackTrace = lua_tostring(obj->lua_, -1);
 			v8::Local<v8::Object> retn = v8::Object::New(isolate);
+
+			v8::Local<v8::Value> luaErrorMsg = ValueFromLuaObject(isolate, obj->lua_, -1);
+			luaL_traceback(obj->lua_, obj->lua_, NULL, 1);
+			v8::Local<v8::Value> luaStackTrace = ValueFromLuaObject(isolate, obj->lua_, -1);
+
 			retn->Set(
-				String::NewFromUtf8(isolate, "error"),
-				String::NewFromUtf8(isolate, luaErrorMsg)
+				v8::String::NewFromUtf8(isolate, "error"),
+				luaErrorMsg
 			);
 			retn->Set(
-				String::NewFromUtf8(isolate, "stack"),
-				String::NewFromUtf8(isolate, luaStackTrace)
+				v8::String::NewFromUtf8(isolate, "stack"),
+				luaStackTrace
 			);
-            isolate->ThrowException(Exception::Error(retn));
+            isolate->ThrowException(retn);
             return;
         } else {
             if (lua_gettop(obj->lua_)) {
