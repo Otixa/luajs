@@ -48,7 +48,7 @@ v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int 
             lua_pushnil(L);
             while (lua_next(L, -2) != 0) {
                 v8::Local<v8::Value> key = ValueFromLuaObject(isolate, L, -2);
-                v8::Local<v8::Value> value = ValueFromLuaObject(isolate, L, -2);
+                v8::Local<v8::Value> value = ValueFromLuaObject(isolate, L, -1);
                 obj->Set(key, value);
                 lua_pop(L, 1);
             }
