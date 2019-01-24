@@ -7,8 +7,10 @@
 
 
 // NodeJS headers
+#include <map>
 #include <node.h>
 #include <node_object_wrap.h>
+#include <nan.h>
 #include <v8.h>
 #include <uv.h>
 #include <functional>
@@ -27,6 +29,7 @@ namespace luajs {
   class LuaState : public node::ObjectWrap {
   public:
     LuaState(lua_State *state, const char *name);
+    static int CallFunction(lua_State * L);
     static void Init(v8::Local<v8::Object> exports);
 
     static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -35,6 +38,7 @@ namespace luajs {
 
     static void DoString(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void ToValue(const v8::FunctionCallbackInfo<v8::Value>& args);
+    static void RegisterFunction(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void DoStringSync(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void DoFile(const v8::FunctionCallbackInfo<v8::Value>& args);
     static void DoFileSync(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -49,11 +53,14 @@ namespace luajs {
     lua_State* GetLuaState() { return lua_; }
     const char* GetName() { return name_; }
     bool IsClosed() { return isClosed_; }
+    static LuaState* getCurrentInstance();
+    static void setCurrentInstance(LuaState*);
 
   private:
     ~LuaState();
-
+    static LuaState* instance;
     lua_State *lua_;
+    std::map<const char*, Nan::Persistent<v8::Function>> functions;
     const char *name_;
     bool isClosed_;
     v8::Isolate* isolate_;
