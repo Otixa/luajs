@@ -247,18 +247,20 @@ namespace luajs
   }
 
   int LuaState::CallFunction(lua_State* L) {
-
+    int n = lua_gettop(L);
     char *func_name = (char *)lua_tostring(L, lua_upvalueindex(1));
 
-    v8::Local<v8::Value> ret_val = Nan::Undefined();
+      
+      const unsigned argc = n;
+      Local<Value>* argv = new Local<Value>[argc];
+      Isolate* isolate = Nan::GetCurrentContext()->Global()->GetIsolate();
+      LuaState* self = LuaState::getCurrentInstance();
 
-    if (LuaState::getCurrentInstance()) {
-      LuaState *self = LuaState::getCurrentInstance();
-      lua_State *mainL = self->lua_;
-      self->lua_ = L;
-
-      const unsigned argc = 0;
-      Local<Value>* argv = new Local<Value>[0];
+      int i;
+      for (i = 1; i <= n; ++i) {
+        argv[i - 1] = ValueFromLuaObject(isolate, L, i);
+      }
+      Local<Value> ret_val = Nan::Undefined();
 
       std::map<const char *, Nan::Persistent<v8::Function> >::iterator iter;
       for (iter = self->functions.begin(); iter != self->functions.end(); iter++) {
@@ -269,9 +271,8 @@ namespace luajs
         }
       }
 
-      self->lua_ = mainL;
-    }
-    return 0;
+      PushValueToLua(Nan::GetCurrentContext()->Global()->GetIsolate(), ret_val, L);
+    return 1;
   }
 
   void LuaState::RegisterFunction(const FunctionCallbackInfo<Value> &args) {
@@ -294,7 +295,6 @@ namespace luajs
     }
 
     LuaState* obj = ObjectWrap::Unwrap<LuaState>(args.This());
-    LuaState::setCurrentInstance(obj);
     CHECK_LUA_STATE_IS_OPEN(isolate, obj);
     lua_State* L = obj->lua_;
 
@@ -306,7 +306,6 @@ namespace luajs
     lua_pushstring(L, func_name);
     lua_pushcclosure(L, CallFunction, 1);
     lua_setglobal(L, func_name);
-    LuaState::setCurrentInstance(0);
     args.GetReturnValue().Set(Undefined(isolate));
   }
 

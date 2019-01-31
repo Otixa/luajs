@@ -62,9 +62,11 @@ v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int 
 
 void PushValueToLua(v8::Isolate *isolate, v8::Local<v8::Value> value, lua_State *L) {
     if (value->IsBoolean()) {
-        lua_pushboolean(L, static_cast<int>(value->ToBoolean()->Value()));
+        int val = static_cast<int>(value->ToBoolean()->Value());
+        lua_pushboolean(L, val);
     } else if (value->IsNumber()) {
-        lua_pushnumber(L, value->ToNumber(isolate)->Value());
+        double val = value->ToNumber(isolate)->Value();
+        lua_pushnumber(L, val);
     } else if (value->IsString()) {
         lua_pushstring(L, ValueToChar(isolate, value));
     } else if (value->IsNull()) {
