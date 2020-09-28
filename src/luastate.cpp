@@ -70,18 +70,18 @@ namespace luajs
 
     if (worker->error)
     {
-      resolver->Reject(Nan::New(worker->msg).ToLocalChecked());
+      resolver->Reject(Nan::GetCurrentContext(), Nan::New(worker->msg).ToLocalChecked());
     }
     else
     {
       if (worker->returnFromStack)
       {
         Local<Value> retval = ValueFromLuaObject(worker->isolate, worker->state->GetLuaState(), -1);
-        resolver->Resolve(retval);
+        resolver->Resolve(Nan::GetCurrentContext(), retval);
       }
       else
       {
-        resolver->Resolve(Nan::New(worker->successRetval));
+        resolver->Resolve(Nan::GetCurrentContext(), Nan::New(worker->successRetval));
       }
     }
 
@@ -139,8 +139,8 @@ namespace luajs
     //NODE_SET_PROTOTYPE_METHOD(tpl, "loadString", LoadString);
     //NODE_SET_PROTOTYPE_METHOD(tpl, "loadStringSync", LoadStringSync);
 
-    constructor.Reset(isolate, tpl->GetFunction());
-    exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction());
+    constructor.Reset(isolate, tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
+    exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
   }
 
   void LuaState::New(const FunctionCallbackInfo<Value> &args)
@@ -216,8 +216,9 @@ namespace luajs
     {
       lua_getinfo(L, "nSl", &info);
       Local<String> str = String::Concat(
-        String::Concat(Integer::New(isolate, level)->ToString(), String::NewFromUtf8(isolate, "| ")),
-        String::Concat(String::NewFromUtf8(isolate, info.short_src), String::NewFromUtf8(isolate, "|ln: ")));
+              isolate,
+        String::Concat(isolate, Integer::New(isolate, level)->ToString(isolate), String::NewFromUtf8(isolate, "| ")),
+        String::Concat(isolate, String::NewFromUtf8(isolate, info.short_src), String::NewFromUtf8(isolate, "|ln: ")));
       /*sprintf(s, "  [%d] %s:%d -- %s [%s]\n",
           level, info.short_src, info.currentline,
           (info.name ? info.name : "<unknown>"), info.what);*/
@@ -235,7 +236,7 @@ namespace luajs
       isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#toValue takes exactly one argument")));
     }
 
-    int offset = args[0]->Int32Value();
+    int offset = args[0]->Int32Value(isolate->GetCurrentContext()).ToChecked();
 
     LuaState *obj = ObjectWrap::Unwrap<LuaState>(args.This());
     if (lua_gettop(obj->lua_))
@@ -578,7 +579,7 @@ namespace luajs
 
     luajs::LuaState *obj = node::ObjectWrap::Unwrap<luajs::LuaState>(args.This());
 
-    auto resolver = v8::Promise::Resolver::New(args.GetIsolate());
+    auto resolver = v8::Promise::Resolver::New(args.GetIsolate()->GetCurrentContext()).ToLocalChecked();
     auto promise = resolver->GetPromise();
     auto persistent = new ResolverPersistent(resolver);
 

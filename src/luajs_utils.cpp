@@ -20,7 +20,7 @@ const char *ValueToChar(v8::Isolate *isolate, v8::Local<v8::Value> val){
         return NULL;
     }
 
-    v8::String::Utf8Value val_string(val);
+    v8::String::Utf8Value val_string(isolate, val);
     char * val_char_ptr = (char *) malloc(val_string.length() + 1);
     strcpy(val_char_ptr, *val_string);
     return val_char_ptr;
@@ -62,7 +62,7 @@ v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int 
 
 void PushValueToLua(v8::Isolate *isolate, v8::Local<v8::Value> value, lua_State *L) {
     if (value->IsBoolean()) {
-        int val = static_cast<int>(value->ToBoolean()->Value());
+        int val = static_cast<int>(value->ToBoolean(isolate)->Value());
         lua_pushboolean(L, val);
     } else if (value->IsNumber()) {
         double val = value->ToNumber(isolate)->Value();
@@ -72,8 +72,8 @@ void PushValueToLua(v8::Isolate *isolate, v8::Local<v8::Value> value, lua_State 
     } else if (value->IsNull()) {
         lua_pushnil(L);
     } else if (value->IsObject()) {
-        v8::Local<v8::Object> obj = value->ToObject();
-        v8::Local<v8::Array> keys = obj->GetPropertyNames();
+        v8::Local<v8::Object> obj = value->ToObject(isolate);
+        v8::Local<v8::Array> keys = obj->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
 
         lua_createtable(L, 0, keys->Length());
 
