@@ -13,6 +13,8 @@
 #include "asprintf.h"
 
 using namespace v8;
+using v8::MaybeLocal;
+using v8::NewStringType;
 
 using ResolverPersistent = Nan::Persistent<v8::Promise::Resolver>;
 using FunctionPersistent = Nan::Persistent<v8::Function, v8::NonCopyablePersistentTraits<v8::Function>>;
@@ -30,7 +32,7 @@ static bool NameExists(std::string name)
   {                                                                                            \
     char *errorMsg;                                                                            \
     asprintf(&errorMsg, "Error: LuaState %s is closed\n", obj->name_);                         \
-    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, errorMsg))); \
+    isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, errorMsg, NewStringType::kNormal).ToLocalChecked())); \
     free(errorMsg);                                                                            \
     return;                                                                                    \
   }
@@ -118,7 +120,7 @@ namespace luajs
     Isolate *isolate = exports->GetIsolate();
 
     Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-    tpl->SetClassName(String::NewFromUtf8(isolate, "LuaState"));
+    tpl->SetClassName(String::NewFromUtf8(isolate, "LuaState", NewStringType::kNormal).ToLocalChecked());
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
     NODE_SET_PROTOTYPE_METHOD(tpl, "close", Close);
@@ -140,7 +142,7 @@ namespace luajs
     //NODE_SET_PROTOTYPE_METHOD(tpl, "loadStringSync", LoadStringSync);
 
     constructor.Reset(isolate, tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
-    exports->Set(String::NewFromUtf8(isolate, "LuaState"), tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
+    exports->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "LuaState", NewStringType::kNormal).ToLocalChecked(), tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked());
   }
 
   void LuaState::New(const FunctionCallbackInfo<Value> &args)
@@ -166,7 +168,7 @@ namespace luajs
     {
       char *excMessage;
       asprintf(&excMessage, "Error: LuaState with name '%s' already exists", name);
-      isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage)));
+      isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(isolate, excMessage, NewStringType::kNormal).ToLocalChecked()));
       free(excMessage);
       return;
     }
@@ -217,8 +219,8 @@ namespace luajs
       lua_getinfo(L, "nSl", &info);
       Local<String> str = String::Concat(
               isolate,
-        String::Concat(isolate, Integer::New(isolate, level)->ToString(isolate), String::NewFromUtf8(isolate, "| ")),
-        String::Concat(isolate, String::NewFromUtf8(isolate, info.short_src), String::NewFromUtf8(isolate, "|ln: ")));
+        String::Concat(isolate, Integer::New(isolate, level)->ToString(isolate->GetCurrentContext()).ToLocalChecked(), String::NewFromUtf8(isolate, "| ", NewStringType::kNormal).ToLocalChecked()),
+        String::Concat(isolate, String::NewFromUtf8(isolate, info.short_src, NewStringType::kNormal).ToLocalChecked(), String::NewFromUtf8(isolate, "|ln: ", NewStringType::kNormal).ToLocalChecked()));
       /*sprintf(s, "  [%d] %s:%d -- %s [%s]\n",
           level, info.short_src, info.currentline,
           (info.name ? info.name : "<unknown>"), info.what);*/
@@ -233,7 +235,7 @@ namespace luajs
     HandleScope scope(isolate);
     if (args.Length() != 1)
     {
-      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#toValue takes exactly one argument")));
+      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#toValue takes exactly one argument", NewStringType::kNormal).ToLocalChecked()));
     }
 
     int offset = args[0]->Int32Value(isolate->GetCurrentContext()).ToChecked();
@@ -244,7 +246,7 @@ namespace luajs
       args.GetReturnValue().Set(ValueFromLuaObject(isolate, obj->lua_, -offset));
       return;
     }
-    isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#toValue stack is empty")));
+    isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#toValue stack is empty", NewStringType::kNormal).ToLocalChecked()));
   }
 
   int LuaState::CallFunction(lua_State* L) {
@@ -339,7 +341,7 @@ namespace luajs
 
     if (args.Length() > 2)
     {
-      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#doStringSync too many arguments")));
+      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#doStringSync too many arguments", NewStringType::kNormal).ToLocalChecked()));
     }
 
     const char *code = ValueToChar(isolate, args[0]);
@@ -360,11 +362,11 @@ namespace luajs
     {
       Local<Object> retn = Object::New(isolate);
       Local<Value> luaStackTrace = ValueFromLuaObject(isolate, obj->lua_, -1);
-      retn->Set(
-        String::NewFromUtf8(isolate, "Stack"),
+      retn->Set(isolate->GetCurrentContext(),
+        String::NewFromUtf8(isolate, "Stack", NewStringType::kNormal).ToLocalChecked(),
         luaStackTrace);
-      retn->Set(
-        String::NewFromUtf8(isolate, "Debug"),
+      retn->Set(isolate->GetCurrentContext(),
+        String::NewFromUtf8(isolate, "Debug", NewStringType::kNormal).ToLocalChecked(),
         Integer::New(isolate, lua_gettop(obj->lua_)));
       isolate->ThrowException(retn);
       LuaState::setCurrentInstance(0);
@@ -387,7 +389,7 @@ namespace luajs
 
     if (args.Length() != 1)
     {
-      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#DoFileSync takes exactly one argument")));
+      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#DoFileSync takes exactly one argument", NewStringType::kNormal).ToLocalChecked()));
       return;
     }
 
@@ -400,7 +402,7 @@ namespace luajs
     if (luaL_dofile(obj->lua_, file))
     {
       const char *luaErrorMsg = lua_tostring(obj->lua_, -1);
-      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, luaErrorMsg)));
+      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, luaErrorMsg, NewStringType::kNormal).ToLocalChecked()));
       LuaState::setCurrentInstance(0);
       return;
     }
@@ -458,7 +460,7 @@ namespace luajs
 
     if (!args[0]->IsString())
     {
-      isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#getGlobal takes exactly one string")));
+      isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#getGlobal takes exactly one string", NewStringType::kNormal).ToLocalChecked()));
       return;
     }
     const char *globalName = ValueToChar(isolate, args[0]);
@@ -478,7 +480,7 @@ namespace luajs
 
     if (args.Length() != 2)
     {
-      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#setGlobal takes exactly two arguments")));
+      isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "LuaState#setGlobal takes exactly two arguments", NewStringType::kNormal).ToLocalChecked()));
       return;
     }
 
@@ -516,7 +518,7 @@ namespace luajs
 
     if (args.Length() != 1 && !args[0]->IsString())
     {
-      isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument")));
+      isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument", NewStringType::kNormal).ToLocalChecked()));
       return;
     }
 
@@ -543,7 +545,7 @@ namespace luajs
 
     if (args.Length() != 1 && !args[0]->IsString())
     {
-      isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument")));
+      isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "LuaState#loadString takes one string argument", NewStringType::kNormal).ToLocalChecked()));
       return;
     }
 
