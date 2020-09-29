@@ -5,6 +5,8 @@
 #include "luajs_utils.h"
 #include "uuid/sole.h"
 
+using v8::MaybeLocal;
+using v8::NewStringType;
 
 const char *RandomUUID() {
     sole::uuid id = sole::uuid4();
@@ -16,7 +18,7 @@ const char *RandomUUID() {
 
 const char *ValueToChar(v8::Isolate *isolate, v8::Local<v8::Value> val){
     if(!val->IsString()){
-        isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, "Argument Must Be A String")));
+        isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, "Argument Must Be A String", NewStringType::kNormal).ToLocalChecked()));
         return NULL;
     }
 
@@ -40,7 +42,7 @@ v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int 
         }
         case LUA_TSTRING: {
             const char *value = lua_tostring(L, index);
-            return v8::Local<v8::String>::New(isolate, v8::String::NewFromUtf8(isolate, value));
+            return v8::Local<v8::String>::New(isolate, v8::String::NewFromUtf8(isolate, value, NewStringType::kNormal).ToLocalChecked());
         }
         case LUA_TTABLE: {
             v8::Local<v8::Object> obj = v8::Object::New(isolate);
@@ -49,7 +51,7 @@ v8::Local<v8::Value> ValueFromLuaObject(v8::Isolate *isolate, lua_State *L, int 
             while (lua_next(L, -2) != 0) {
                 v8::Local<v8::Value> key = ValueFromLuaObject(isolate, L, -2);
                 v8::Local<v8::Value> value = ValueFromLuaObject(isolate, L, -1);
-                obj->Set(key, value);
+                obj->Set(isolate->GetCurrentContext(),key, value).ToChecked();
                 lua_pop(L, 1);
             }
             return obj;
@@ -65,21 +67,21 @@ void PushValueToLua(v8::Isolate *isolate, v8::Local<v8::Value> value, lua_State 
         int val = static_cast<int>(value->ToBoolean(isolate)->Value());
         lua_pushboolean(L, val);
     } else if (value->IsNumber()) {
-        double val = value->ToNumber(isolate)->Value();
+        double val = value->ToNumber(isolate->GetCurrentContext()).ToLocalChecked()->Value();
         lua_pushnumber(L, val);
     } else if (value->IsString()) {
         lua_pushstring(L, ValueToChar(isolate, value));
     } else if (value->IsNull()) {
         lua_pushnil(L);
     } else if (value->IsObject()) {
-        v8::Local<v8::Object> obj = value->ToObject(isolate);
+        v8::Local<v8::Object> obj = value->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
         v8::Local<v8::Array> keys = obj->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
 
         lua_createtable(L, 0, keys->Length());
 
         for (int i = 0; i < keys->Length(); ++i) {
-            v8::Local<v8::Value> key = keys->Get(i);
-            v8::Local<v8::Value> value = obj->Get(key);
+            v8::Local<v8::Value> key = keys->Get(isolate->GetCurrentContext(), i).ToLocalChecked();
+            v8::Local<v8::Value> value = obj->Get(isolate->GetCurrentContext(), key).ToLocalChecked();
             PushValueToLua(isolate, key, L);
             PushValueToLua(isolate, value, L);
             lua_settable(L, -3);

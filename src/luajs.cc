@@ -13,6 +13,7 @@ namespace luajs {
     using v8::Object;
     using v8::String;
     using v8::Value;
+    using v8::MaybeLocal;
 
 
     void DefineConstants(Local<Object> exports) {
@@ -86,7 +87,7 @@ namespace luajs {
 
     static void LuaVersion(const FunctionCallbackInfo<Value>& args) {
         Isolate* isolate = args.GetIsolate();
-        args.GetReturnValue().Set(String::NewFromUtf8(isolate, LUA_VERSION));
+        args.GetReturnValue().Set(String::NewFromUtf8(isolate, LUA_VERSION, v8::NewStringType::kNormal).ToLocalChecked());
     }
 
     void Initialize(Local<Object> exports) {

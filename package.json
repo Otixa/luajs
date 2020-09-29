@@ -6,6 +6,9 @@
   "repository": "https://github.com/lukaskollmer/luajs",
   "author": "Lukas Kollmer",
   "license": "MIT",
+  "engines": {
+    "node": ">=10.0.0"
+  },
   "dependencies": {
     "bindings": "^1.2.1"
   },
